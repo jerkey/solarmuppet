@@ -7,7 +7,7 @@
 #define BATTVOLTPIN A0 // which pin reports battery voltage from resistors
 #define SOLARVOLTPIN A1 // which pin reports solar panel voltage from resistors
 #define BUCK_CUTIN 5.0  // minimum voltage to turn on transistors
-#define BUCK_PERIOD 750 // milliseconds between buck converter pwm updates
+#define BUCK_PERIOD 250 // milliseconds between buck converter pwm updates
 #define SOLAR_CUTIN 13.0 // voltage above which the solar panel is useful
 #define GETLOOPS 10  // how many times to getvoltage per main loop
 #define DISPLAY_PERIOD 1500  // how many milliseconds between printdisplay()s
@@ -22,6 +22,7 @@ int solarAverageADC = 0;  // average ADC value of solarvoltpin
 unsigned long timeNow, lastBuck, lastDisplay = 0; // to hold system times
 int buckDirection = 1;  // amount to change PWM of buck converter while hunting
 int lastBuckPWM, buckPWM = 0;  // PWM value of buck converter
+float buckJump = 5.0;  // how much to change buckPWM per doBuck() cycle
 
 void setup() {
   setPwmFrequency(BUCKPIN,1); // this sets the frequency of PWM on pins 3 and 11 to 31,250 Hz
@@ -42,13 +43,31 @@ void loop() {
 }
 
 void doBuck() {
-  if ((battVoltage > BUCK_CUTIN) || (solarVoltage > SOLAR_CUTIN)) { // voltage is high enough to turn on transistors
-    digitalWrite(SOLARDISCONNECTPIN,HIGH);  // turn on minus-side FET
-    if (timeNow - lastBuck > BUCK_PERIOD) {
-      if (lastBattVoltage) {
-        buckDirection;
-	}
-    }
+  if (battVoltage > BUCK_CUTIN) { // voltage is high enough to turn on transistors
+    if (solarVoltage > SOLAR_CUTIN) digitalWrite(SOLARDISCONNECTPIN,HIGH);  // turn on minus-side FET
+		  else {
+			digitalWrite(SOLARDISCONNECTPIN,LOW); // dont want solar panel draining batts at night
+			buckPWM = 0;  // turn off high side FET
+			setPWM(buckPWM);
+			}
+    if (timeNow - lastBuck > BUCK_PERIOD) { // if it has been long enough since last time
+      if (!buckPWM) {  // the sun just came up
+				buckDirection = buckJump; // start with an initial PWM value
+				buckPWM += buckDirection; // we are going to track up now
+				setPWM(buckPWM);  // set the PWM value
+      } else {
+				if (battVoltage < lastBattVoltage) buckDirection *= -1;  // if voltage went down, change hunting direction
+				buckPWM += buckDirection; // hunt in whatever direction we are trying now
+				setPWM(buckPWM);  // set the PWM value
+      }
+    } // if (timeNow - lastBuck > BUCK_PERIOD)
+  }  // if (battVoltage > BUCK_CUTIN)
+}
+
+void setPWM(int pwmVal) {
+  if (pwmVal != lastBuckPWM) {
+    lastBuckPWM = pwmVal;
+    analogWrite(BUCKPIN,pwmVal);
   }
 }
 
