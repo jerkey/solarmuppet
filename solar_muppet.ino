@@ -7,7 +7,11 @@
 #define BATTVOLTPIN A0 // which pin reports battery voltage from resistors
 #define SOLARVOLTPIN A1 // which pin reports solar panel voltage from resistors
 #define BUCK_CUTIN 5.0  // minimum voltage to turn on transistors
+#define BUCK_PERIOD 750 // milliseconds between buck converter pwm updates
 #define SOLAR_CUTIN 13.0 // voltage above which the solar panel is useful
+#define GETLOOPS 10  // how many times to getvoltage per main loop
+#define DISPLAY_PERIOD 1500  // how many milliseconds between printdisplay()s
+#define AVG_CYCLES 50  // cycles of averaging function
 
 #define BAUDRATE 57600 // serial baud rate for communications with world
 
@@ -15,29 +19,54 @@ float battVoltage, lastBattVoltage = 0;  // voltage of battery
 float solarVoltage = 0;  // voltage at panel
 int battAverageADC = 0;  // average ADC value of battvoltpin
 int solarAverageADC = 0;  // average ADC value of solarvoltpin
+unsigned long timeNow, lastBuck, lastDisplay = 0; // to hold system times
+int buckDirection = 1;  // amount to change PWM of buck converter while hunting
+int lastBuckPWM, buckPWM = 0;  // PWM value of buck converter
 
 void setup() {
   setPwmFrequency(BUCKPIN,1); // this sets the frequency of PWM on pins 3 and 11 to 31,250 Hz
   Serial.begin(BAUDRATE);
-  pinMode(BUCKPIN,OUTPUT);
+  pinMode(BUCKPIN,OUTPUT);  // connects to high-side transistors (Drain to Solar plus)
   pinMode(SOLARDISCONNECTPIN,OUTPUT);  // this must be high to tie solar- to ground when charging
-  getVoltages();
+  for (int i = 0 ; i < GETLOOPS ; i++) getVoltages();  // get initial voltage measurements
 }
 
 void loop() {
-  getVoltages();
-  doBuck();
-  printDisplay();
+  timeNow = millis();  // get system time for this loop
+  for (int i = 0 ; i < GETLOOPS ; i++) getVoltages();  // update voltage measurements
+  doBuck();  // update buck converter PWM value
+  if (timeNow - lastDisplay > DISPLAY_PERIOD) {
+    printDisplay();  // send serial information to the world
+    lastDisplay = timeNow;
+  }
 }
 
 void doBuck() {
   if ((battVoltage > BUCK_CUTIN) || (solarVoltage > SOLAR_CUTIN)) { // voltage is high enough to turn on transistors
-    
+    digitalWrite(SOLARDISCONNECTPIN,HIGH);  // turn on minus-side FET
+    if (timeNow - lastBuck > BUCK_PERIOD) {
+      if (lastBattVoltage) {
+        buckDirection;
+	}
+    }
+  }
+}
 
+void printDisplay() {
+  Serial.print("battery: ");
+  Serial.print(battVoltage);
+  Serial.print(" (");
+  Serial.print(battAverageADC);
+  Serial.print(") solar: ");
+  Serial.print(solarVoltage);
+  Serial.print(" (");
+  Serial.print(solarAverageADC);
+  Serial.print(") buckPWM value: ");
+  Serial.println(buckPWM);
+}
 
 void getVoltages() {
   battAverageADC = average(analogRead(BATTVOLTPIN), battAverageADC); // average digital value
-  lastBattVoltage = battVoltage; // save the previous voltage to see if it's higher or lower
   battVoltage = battAverageADC / VOLTCOEFF;  // convert ADC value to actual voltage
   
   solarAverageADC = average(analogRead(BATTVOLTPIN), solarAverageADC); // average digital value
