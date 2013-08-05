@@ -1,17 +1,17 @@
 #define VOLTCOEFF 13.25 // calibrates perception of battery voltage
-#define MAXBUCK 254 // maximum pwm value for buck converter
-
 #define BUCKPIN 3 // which pin controls buck-converter transistors
 // only use pin 3, 9, 10, or 11.  using 5 or 6 messes up millis() timing
 #define SOLARDISCONNECTPIN 2 // turns on transistor linking solar- to ground
 #define BATTVOLTPIN A0 // which pin reports battery voltage from resistors
 #define SOLARVOLTPIN A1 // which pin reports solar panel voltage from resistors
+
 #define BUCK_CUTIN 5.0  // minimum voltage to turn on transistors
 #define BUCK_PERIOD 250 // milliseconds between buck converter pwm updates
 #define SOLAR_CUTIN 13.0 // voltage above which the solar panel is useful
 #define GETLOOPS 10  // how many times to getvoltage per main loop
 #define DISPLAY_PERIOD 1500  // how many milliseconds between printdisplay()s
 #define AVG_CYCLES 50  // cycles of averaging function
+#define MAXBUCK 254 // maximum pwm value for buck converter
 
 #define BAUDRATE 57600 // serial baud rate for communications with world
 
@@ -43,25 +43,27 @@ void loop() {
 }
 
 void doBuck() {
-  if (battVoltage > BUCK_CUTIN) { // voltage is high enough to turn on transistors
-    if (solarVoltage > SOLAR_CUTIN) digitalWrite(SOLARDISCONNECTPIN,HIGH);  // turn on minus-side FET
-		  else {
-			digitalWrite(SOLARDISCONNECTPIN,LOW); // dont want solar panel draining batts at night
-			buckPWM = 0;  // turn off high side FET
-			setPWM(buckPWM);
-			}
+  if ((battVoltage > BUCK_CUTIN) &&  (solarVoltage > SOLAR_CUTIN)) {
+    if (buckPWM == 0) digitalWrite(SOLARDISCONNECTPIN,HIGH);  // turn on minus-side FET
     if (timeNow - lastBuck > BUCK_PERIOD) { // if it has been long enough since last time
       if (!buckPWM) {  // the sun just came up
-				buckDirection = buckJump; // start with an initial PWM value
-				buckPWM += buckDirection; // we are going to track up now
-				setPWM(buckPWM);  // set the PWM value
-      } else {
-				if (battVoltage < lastBattVoltage) buckDirection *= -1;  // if voltage went down, change hunting direction
-				buckPWM += buckDirection; // hunt in whatever direction we are trying now
-				setPWM(buckPWM);  // set the PWM value
-      }
+        buckDirection = buckJump; // start with an initial PWM value
+        buckPWM += buckDirection; // we are going to track up now
+        setPWM(buckPWM);  // set the PWM value
+      } 
+      else {
+        if (battVoltage < lastBattVoltage) buckDirection *= -1;  // if voltage went down, change hunting direction
+        buckPWM += buckDirection; // hunt in whatever direction we are trying now
+        setPWM(buckPWM);  // set the PWM value
+      } // else
     } // if (timeNow - lastBuck > BUCK_PERIOD)
   }  // if (battVoltage > BUCK_CUTIN)
+  else { // there is not enough power to be charging right now
+    digitalWrite(SOLARDISCONNECTPIN,LOW); // dont want solar panel draining batts at night
+    buckPWM = 0;  // turn off high side FET
+    setPWM(buckPWM);
+  }
+
 }
 
 void setPWM(int pwmVal) {
@@ -87,14 +89,14 @@ void printDisplay() {
 void getVoltages() {
   battAverageADC = average(analogRead(BATTVOLTPIN), battAverageADC); // average digital value
   battVoltage = battAverageADC / VOLTCOEFF;  // convert ADC value to actual voltage
-  
+
   solarAverageADC = average(analogRead(BATTVOLTPIN), solarAverageADC); // average digital value
   solarVoltage = solarAverageADC / VOLTCOEFF;  // convert ADC value to actual voltage
 }
 
 float average(float val, float avg){
   if(avg == 0)
-  avg = val;
+    avg = val;
   return (val + (avg * (AVG_CYCLES - 1))) / AVG_CYCLES;
 }
 
@@ -156,4 +158,6 @@ void setPwmFrequency(int pin, int divisor) {
     TCCR2B = TCCR2B & 0b11111000 | mode;
   }
 }
+
+
 
