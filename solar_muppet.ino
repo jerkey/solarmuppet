@@ -1,5 +1,7 @@
-#define BATTVOLTCOEFF 18.96 // calibrates perception of battery voltage
-#define SOLARVOLTCOEFF 9.35 // calibrates perception of battery voltage
+#define BATTVOLTCOEFF 18.31 // calibrates perception of battery voltage
+#define SOLARVOLTCOEFF 9.666 // calibrates perception of battery voltage
+#define LOWVOLTAGEDISCONNECT 10.5 
+#define LOWVOLTAGEDISCONNECTPIN 13
 // 10v = .457v at pin1 = vsolar 20k/1k ohm
 // 10v = .927v at pin18 = vbatt?
 // ground at pin5,  5v at pin 14
@@ -26,7 +28,7 @@ unsigned long timeNow, lastBuck, lastDisplay = 0; // to hold system times
 float buckDirection;  // amount to change PWM of buck converter while hunting
 int lastBuckPWM = 0; // used to make sure we only analogWrite when integer changes
 float buckPWM = 0.0;  // float to become PWM value of buck converter
-float buckJump = 5.0;  // how much to change buckPWM per doBuck() cycle
+float buckJump = 2.0;  // how much to change buckPWM per doBuck() cycle
 
 void setup() {
   setPwmFrequency(BUCKPIN,1); // this sets the frequency of PWM on pins 3 and 11 to 31,250 Hz
@@ -40,6 +42,7 @@ void loop() {
   timeNow = millis();  // get system time for this loop
   lastBattVoltage = battVoltage;  // save previous battery voltage for comparison
   getVoltages();  // update voltage measurements
+  digitalWrite(LOWVOLTAGEDISCONNECTPIN, (battVoltage > LOWVOLTAGEDISCONNECT));
   doBuck();  // update buck converter PWM value
   if (timeNow - lastDisplay > DISPLAY_PERIOD) {
     printDisplay();  // send serial information to the world
@@ -87,11 +90,11 @@ void printDisplay() {
   Serial.print("battery: ");
   Serial.print(battVoltage);
   Serial.print(" (");
-  Serial.print(battAverageADC);
+  Serial.print((float)battAverageADC / (float)AVG_CYCLES);
   Serial.print(") solar: ");
   Serial.print(solarVoltage);
   Serial.print(" (");
-  Serial.print(solarAverageADC);
+  Serial.print((float)solarAverageADC / (float)AVG_CYCLES);
   Serial.print(") buckPWM value: ");
   Serial.println(buckPWM);
 }
@@ -99,11 +102,11 @@ void printDisplay() {
 void getVoltages() {
   battAverageADC = 0;
   for (int i = 0 ; i < AVG_CYCLES ; i++) battAverageADC += analogRead(BATTVOLTPIN); // average digital value
-  battVoltage = (float)battAverageADC / (float)AVG_CYCLES / BATTVOLTCOEFF;  // convert ADC value to actual voltage
+  battVoltage = ((float)battAverageADC / (float)AVG_CYCLES) / BATTVOLTCOEFF;  // convert ADC value to actual voltage
 
   solarAverageADC = 0;
   for (int i = 0 ; i < AVG_CYCLES ; i++) solarAverageADC += analogRead(SOLARVOLTPIN); // average digital value
-  solarVoltage = (float)solarAverageADC / (float)AVG_CYCLES / SOLARVOLTCOEFF;  // convert ADC value to actual voltage
+  solarVoltage = ((float)solarAverageADC / (float)AVG_CYCLES) / SOLARVOLTCOEFF;  // convert ADC value to actual voltage
 }
 
 void setPwmFrequency(int pin, int divisor) {
