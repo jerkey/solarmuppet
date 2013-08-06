@@ -12,9 +12,8 @@
 #define BUCK_CUTIN 5.0  // minimum voltage to turn on transistors
 #define BUCK_PERIOD 250 // milliseconds between buck converter pwm updates
 #define SOLAR_CUTIN 13.0 // voltage above which the solar panel is useful
-#define GETLOOPS 10  // how many times to getvoltage per main loop
-#define DISPLAY_PERIOD 1500  // how many milliseconds between printdisplay()s
-#define AVG_CYCLES 50  // cycles of averaging function
+#define DISPLAY_PERIOD 750  // how many milliseconds between printdisplay()s
+#define AVG_CYCLES 20  // cycles of averaging function
 #define MAXBUCK 254 // maximum pwm value for buck converter
 
 #define BAUDRATE 9600 // serial baud rate for communications with world
@@ -34,13 +33,13 @@ void setup() {
   Serial.begin(BAUDRATE);
   pinMode(BUCKPIN,OUTPUT);  // connects to high-side transistors (Drain to Solar plus)
   pinMode(SOLARDISCONNECTPIN,OUTPUT);  // this must be high to tie solar- to ground when charging
-  for (int i = 0 ; i < GETLOOPS ; i++) getVoltages();  // get initial voltage measurements
+  getVoltages();  // get initial voltage measurements
 }
 
 void loop() {
   timeNow = millis();  // get system time for this loop
   lastBattVoltage = battVoltage;  // save previous battery voltage for comparison
-  for (int i = 0 ; i < GETLOOPS ; i++) getVoltages();  // update voltage measurements
+  getVoltages();  // update voltage measurements
   doBuck();  // update buck converter PWM value
   if (timeNow - lastDisplay > DISPLAY_PERIOD) {
     printDisplay();  // send serial information to the world
@@ -98,17 +97,13 @@ void printDisplay() {
 }
 
 void getVoltages() {
-  battAverageADC = average(analogRead(BATTVOLTPIN), battAverageADC); // average digital value
-  battVoltage = battAverageADC / BATTVOLTCOEFF;  // convert ADC value to actual voltage
+  battAverageADC = 0;
+  for (int i = 0 ; i < AVG_CYCLES ; i++) battAverageADC += analogRead(BATTVOLTPIN); // average digital value
+  battVoltage = (float)battAverageADC / (float)AVG_CYCLES / BATTVOLTCOEFF;  // convert ADC value to actual voltage
 
-  solarAverageADC = average(analogRead(BATTVOLTPIN), solarAverageADC); // average digital value
-  solarVoltage = solarAverageADC / SOLARVOLTCOEFF;  // convert ADC value to actual voltage
-}
-
-float average(float val, float avg){
-  if(avg == 0)
-    avg = val;
-  return (val + (avg * (AVG_CYCLES - 1))) / AVG_CYCLES;
+  solarAverageADC = 0;
+  for (int i = 0 ; i < AVG_CYCLES ; i++) solarAverageADC += analogRead(SOLARVOLTPIN); // average digital value
+  solarVoltage = (float)solarAverageADC / (float)AVG_CYCLES / SOLARVOLTCOEFF;  // convert ADC value to actual voltage
 }
 
 void setPwmFrequency(int pin, int divisor) {
