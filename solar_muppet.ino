@@ -48,9 +48,6 @@ void setup() {
 
 void loop() {
   timeNow = millis();  // get system time for this loop
-  lastAmpsAverageADC = ampsAverageADC;  // save previous amperage for comparison
-  lastBattAverageADC = battAverageADC;  // save previous battery voltage for comparison
-  lastWattage = wattage; // save previous wattage for comparison
   getVoltages();  // update voltage measurements
   digitalWrite(LOWVOLTAGEDISCONNECTPIN, (battVoltage > LOWVOLTAGEDISCONNECT));
   doBuck();  // update buck converter PWM value
@@ -70,9 +67,9 @@ void doBuck() {
         buckPWM = buckJump; // start with an initial PWM value of one buckJump
         setPWM(buckPWM);  // set the PWM value
       } 
-      else { // keep hunting for the best PWM value for maximum batt. voltage
-        if (battAverageADC < lastBattAverageADC) {
-	  buckDirection *= -1;  // if voltage went down, reverse PWM hunting direction
+      else { // keep hunting for the best PWM value for maximum wattage
+        if (wattage < lastWattage) {
+	  buckDirection *= -1;  // if wattage went down, reverse PWM hunting direction
 	  Serial.print("x");
 	}
         buckPWM += buckDirection; // hunt in whatever direction we are trying now
@@ -91,6 +88,9 @@ void doBuck() {
     buckPWM = 0;  // turn off high side FET
     setPWM(buckPWM);
   }
+  lastAmpsAverageADC = ampsAverageADC;  // save amperage for comparison next time
+  lastBattAverageADC = battAverageADC;  // save battery voltage for comparison next time
+  lastWattage = wattage; // save wattage for comparison next time
 }
 
 void setPWM(float pwmVal) { // only do the analogWrite if integer value has actually changed
