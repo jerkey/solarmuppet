@@ -13,7 +13,7 @@
 #define SOLARVOLTPIN A1 // which pin reports solar panel voltage from resistors
 
 #define BUCK_CUTIN 5.0  // minimum voltage to turn on transistors
-#define BUCK_PERIOD 250 // milliseconds between buck converter pwm updates
+#define BUCK_PERIOD 750 // milliseconds between buck converter pwm updates
 #define SOLAR_CUTIN 13.0 // voltage above which the solar panel is useful
 #define DISPLAY_PERIOD 750  // how many milliseconds between printdisplay()s
 #define AVG_CYCLES 40  // cycles of averaging function
@@ -62,7 +62,10 @@ void doBuck() {
         setPWM(buckPWM);  // set the PWM value
       } 
       else { // keep hunting for the best PWM value for maximum batt. voltage
-        if (battAverageADC < lastBattAverageADC) buckDirection *= -1;  // if voltage went down, reverse PWM hunting direction
+        if (battAverageADC < lastBattAverageADC) {
+	  buckDirection *= -1;  // if voltage went down, reverse PWM hunting direction
+	  Serial.print("x");
+	}
         buckPWM += buckDirection; // hunt in whatever direction we are trying now
 	if ((battVoltage > BATTFLOATVOLTAGE) && (buckDirection > 0)) buckDirection *= -1;
         setPWM(buckPWM);  // set the PWM value
@@ -98,7 +101,9 @@ void printDisplay() {
   Serial.print(" (");
   Serial.print((float)solarAverageADC / (float)AVG_CYCLES);
   Serial.print(") buckPWM value: ");
-  Serial.println(buckPWM);
+  Serial.print(buckPWM);
+  Serial.print(" (");
+  Serial.println(lastBuckPWM);
 }
 
 void getVoltages() {
