@@ -2,6 +2,7 @@
 #define SOLARVOLTCOEFF 9.666 // calibrates perception of battery voltage
 #define LOWVOLTAGEDISCONNECT 10.5 
 #define LOWVOLTAGEDISCONNECTPIN 13
+#define BATTFLOATVOLTAGE 14.1
 // 10v = .457v at pin1 = vsolar 20k/1k ohm
 // 10v = .927v at pin18 = vbatt?
 // ground at pin5,  5v at pin 14
@@ -63,6 +64,7 @@ void doBuck() {
       else { // keep hunting for the best PWM value for maximum batt. voltage
         if (battVoltage < lastBattVoltage) buckDirection *= -1;  // if voltage went down, reverse PWM hunting direction
         buckPWM += buckDirection; // hunt in whatever direction we are trying now
+	if ((battVoltage > BATTFLOATVOLTAGE) && (buckDirection > 0)) buckDirection *= -1;
         setPWM(buckPWM);  // set the PWM value
         if (buckPWM > MAXBUCK) buckPWM = MAXBUCK;
         if (buckPWM < 1) {        
