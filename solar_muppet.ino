@@ -16,14 +16,14 @@
 #define BUCK_PERIOD 250 // milliseconds between buck converter pwm updates
 #define SOLAR_CUTIN 13.0 // voltage above which the solar panel is useful
 #define DISPLAY_PERIOD 750  // how many milliseconds between printdisplay()s
-#define AVG_CYCLES 20  // cycles of averaging function
+#define AVG_CYCLES 40  // cycles of averaging function
 #define MAXBUCK 254 // maximum pwm value for buck converter
 
 #define BAUDRATE 9600 // serial baud rate for communications with world
 
-float battVoltage, lastBattVoltage = 0;  // voltage of battery
+float battVoltage = 0;  // voltage of battery
 float solarVoltage = 0;  // voltage at panel
-int battAverageADC = 0;  // average ADC value of battvoltpin
+int battAverageADC, lastBattAverageADC = 0;  // average ADC value of battvoltpin
 int solarAverageADC = 0;  // average ADC value of solarvoltpin
 unsigned long timeNow, lastBuck, lastDisplay = 0; // to hold system times
 float buckDirection;  // amount to change PWM of buck converter while hunting
@@ -41,7 +41,7 @@ void setup() {
 
 void loop() {
   timeNow = millis();  // get system time for this loop
-  lastBattVoltage = battVoltage;  // save previous battery voltage for comparison
+  lastBattAverageADC = battAverageADC;  // save previous battery voltage for comparison
   getVoltages();  // update voltage measurements
   digitalWrite(LOWVOLTAGEDISCONNECTPIN, (battVoltage > LOWVOLTAGEDISCONNECT));
   doBuck();  // update buck converter PWM value
@@ -62,7 +62,7 @@ void doBuck() {
         setPWM(buckPWM);  // set the PWM value
       } 
       else { // keep hunting for the best PWM value for maximum batt. voltage
-        if (battVoltage < lastBattVoltage) buckDirection *= -1;  // if voltage went down, reverse PWM hunting direction
+        if (battAverageADC < lastBattAverageADC) buckDirection *= -1;  // if voltage went down, reverse PWM hunting direction
         buckPWM += buckDirection; // hunt in whatever direction we are trying now
 	if ((battVoltage > BATTFLOATVOLTAGE) && (buckDirection > 0)) buckDirection *= -1;
         setPWM(buckPWM);  // set the PWM value
