@@ -1,7 +1,11 @@
-#define VOLTCOEFF 13.25 // calibrates perception of battery voltage
+#define BATTVOLTCOEFF 18.96 // calibrates perception of battery voltage
+#define SOLARVOLTCOEFF 9.35 // calibrates perception of battery voltage
+// 10v = .457v at pin1 = vsolar 20k/1k ohm
+// 10v = .927v at pin18 = vbatt?
+// ground at pin5,  5v at pin 14
 #define BUCKPIN 3 // which pin controls buck-converter transistors
 // only use pin 3, 9, 10, or 11.  using 5 or 6 messes up millis() timing
-#define SOLARDISCONNECTPIN 2 // turns on transistor linking solar- to ground
+#define SOLARDISCONNECTPIN 2 // turns on transistor linking solar- to ground, or relay
 #define BATTVOLTPIN A0 // which pin reports battery voltage from resistors
 #define SOLARVOLTPIN A1 // which pin reports solar panel voltage from resistors
 
@@ -13,7 +17,7 @@
 #define AVG_CYCLES 50  // cycles of averaging function
 #define MAXBUCK 254 // maximum pwm value for buck converter
 
-#define BAUDRATE 57600 // serial baud rate for communications with world
+#define BAUDRATE 9600 // serial baud rate for communications with world
 
 float battVoltage, lastBattVoltage = 0;  // voltage of battery
 float solarVoltage = 0;  // voltage at panel
@@ -95,10 +99,10 @@ void printDisplay() {
 
 void getVoltages() {
   battAverageADC = average(analogRead(BATTVOLTPIN), battAverageADC); // average digital value
-  battVoltage = battAverageADC / VOLTCOEFF;  // convert ADC value to actual voltage
+  battVoltage = battAverageADC / BATTVOLTCOEFF;  // convert ADC value to actual voltage
 
   solarAverageADC = average(analogRead(BATTVOLTPIN), solarAverageADC); // average digital value
-  solarVoltage = solarAverageADC / VOLTCOEFF;  // convert ADC value to actual voltage
+  solarVoltage = solarAverageADC / SOLARVOLTCOEFF;  // convert ADC value to actual voltage
 }
 
 float average(float val, float avg){
