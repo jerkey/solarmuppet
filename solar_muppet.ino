@@ -20,8 +20,9 @@ float solarVoltage = 0;  // voltage at panel
 int battAverageADC = 0;  // average ADC value of battvoltpin
 int solarAverageADC = 0;  // average ADC value of solarvoltpin
 unsigned long timeNow, lastBuck, lastDisplay = 0; // to hold system times
-int buckDirection = 1;  // amount to change PWM of buck converter while hunting
-int lastBuckPWM, buckPWM = 0;  // PWM value of buck converter
+float buckDirection;  // amount to change PWM of buck converter while hunting
+int lastBuckPWM = 0; // used to make sure we only analogWrite when integer changes
+float buckPWM = 0.0;  // float to become PWM value of buck converter
 float buckJump = 5.0;  // how much to change buckPWM per doBuck() cycle
 
 void setup() {
@@ -34,6 +35,7 @@ void setup() {
 
 void loop() {
   timeNow = millis();  // get system time for this loop
+  lastBattVoltage = battVoltage;  // save previous battery voltage for comparison
   for (int i = 0 ; i < GETLOOPS ; i++) getVoltages();  // update voltage measurements
   doBuck();  // update buck converter PWM value
   if (timeNow - lastDisplay > DISPLAY_PERIOD) {
@@ -44,17 +46,23 @@ void loop() {
 
 void doBuck() {
   if ((battVoltage > BUCK_CUTIN) &&  (solarVoltage > SOLAR_CUTIN)) {
-    if (buckPWM == 0) digitalWrite(SOLARDISCONNECTPIN,HIGH);  // turn on minus-side FET
     if (timeNow - lastBuck > BUCK_PERIOD) { // if it has been long enough since last time
+      lastBuck = timeNow;  // we are doing it now
       if (!buckPWM) {  // the sun just came up
-        buckDirection = buckJump; // start with an initial PWM value
-        buckPWM += buckDirection; // we are going to track up now
+        digitalWrite(SOLARDISCONNECTPIN,HIGH);  // turn on minus-side FET
+        buckDirection = buckJump; // we are going to track up now
+        buckPWM = buckJump; // start with an initial PWM value of one buckJump
         setPWM(buckPWM);  // set the PWM value
       } 
-      else {
-        if (battVoltage < lastBattVoltage) buckDirection *= -1;  // if voltage went down, change hunting direction
+      else { // keep hunting for the best PWM value for maximum batt. voltage
+        if (battVoltage < lastBattVoltage) buckDirection *= -1;  // if voltage went down, reverse PWM hunting direction
         buckPWM += buckDirection; // hunt in whatever direction we are trying now
         setPWM(buckPWM);  // set the PWM value
+        if (buckPWM > MAXBUCK) buckPWM = MAXBUCK;
+        if (buckPWM < 1) {        
+          buckDirection = buckJump; // we are going to track up now
+          buckPWM = buckJump; // start with an initial PWM value of one buckJump
+        } // if (buckPWM < 1)
       } // else
     } // if (timeNow - lastBuck > BUCK_PERIOD)
   }  // if (battVoltage > BUCK_CUTIN)
@@ -63,13 +71,12 @@ void doBuck() {
     buckPWM = 0;  // turn off high side FET
     setPWM(buckPWM);
   }
-
 }
 
-void setPWM(int pwmVal) {
-  if (pwmVal != lastBuckPWM) {
-    lastBuckPWM = pwmVal;
-    analogWrite(BUCKPIN,pwmVal);
+void setPWM(float pwmVal) { // only do the analogWrite if integer value has actually changed
+  if ((int)pwmVal != lastBuckPWM) {
+    lastBuckPWM = (int)pwmVal;
+    analogWrite(BUCKPIN,lastBuckPWM);
   }
 }
 
