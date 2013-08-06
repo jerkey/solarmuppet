@@ -1,5 +1,8 @@
 #define BATTVOLTCOEFF 18.31 // calibrates perception of battery voltage
 #define SOLARVOLTCOEFF 9.666 // calibrates perception of battery voltage
+#define AMPSCOEFF 52.87  // calibrates perception of charge current
+#define AMPSOFFSET 25  // calibrates zero amps point
+
 #define LOWVOLTAGEDISCONNECT 10.5 
 #define LOWVOLTAGEDISCONNECTPIN 13
 #define BATTFLOATVOLTAGE 14.1
@@ -11,6 +14,7 @@
 #define SOLARDISCONNECTPIN 2 // turns on transistor linking solar- to ground, or relay
 #define BATTVOLTPIN A0 // which pin reports battery voltage from resistors
 #define SOLARVOLTPIN A1 // which pin reports solar panel voltage from resistors
+#define AMPSPIN A3 // how much current is charging
 
 #define BUCK_CUTIN 5.0  // minimum voltage to turn on transistors
 #define BUCK_PERIOD 750 // milliseconds between buck converter pwm updates
@@ -23,7 +27,10 @@
 
 float battVoltage = 0;  // voltage of battery
 float solarVoltage = 0;  // voltage at panel
+float amperage = 0;  // charging current
+float wattage, lastWattage = 0;
 int battAverageADC, lastBattAverageADC = 0;  // average ADC value of battvoltpin
+int ampsAverageADC, lastAmpsAverageADC = 0;  // average ADC value of ampspin
 int solarAverageADC = 0;  // average ADC value of solarvoltpin
 unsigned long timeNow, lastBuck, lastDisplay = 0; // to hold system times
 float buckDirection;  // amount to change PWM of buck converter while hunting
@@ -41,7 +48,9 @@ void setup() {
 
 void loop() {
   timeNow = millis();  // get system time for this loop
+  lastAmpsAverageADC = ampsAverageADC;  // save previous amperage for comparison
   lastBattAverageADC = battAverageADC;  // save previous battery voltage for comparison
+  lastWattage = wattage; // save previous wattage for comparison
   getVoltages();  // update voltage measurements
   digitalWrite(LOWVOLTAGEDISCONNECTPIN, (battVoltage > LOWVOLTAGEDISCONNECT));
   doBuck();  // update buck converter PWM value
@@ -102,8 +111,12 @@ void printDisplay() {
   Serial.print((float)solarAverageADC / (float)AVG_CYCLES);
   Serial.print(") buckPWM value: ");
   Serial.print(buckPWM);
+  Serial.print(" amperage: ");
+  Serial.print(amperage);
   Serial.print(" (");
-  Serial.println(lastBuckPWM);
+  Serial.print((float)ampsAverageADC / (float)AVG_CYCLES);
+  Serial.print(") wattage: ");
+  Serial.println(wattage);
 }
 
 void getVoltages() {
@@ -114,6 +127,12 @@ void getVoltages() {
   solarAverageADC = 0;
   for (int i = 0 ; i < AVG_CYCLES ; i++) solarAverageADC += analogRead(SOLARVOLTPIN); // average digital value
   solarVoltage = ((float)solarAverageADC / (float)AVG_CYCLES) / SOLARVOLTCOEFF;  // convert ADC value to actual voltage
+
+  ampsAverageADC = 0;
+  for (int i = 0 ; i < AVG_CYCLES ; i++) ampsAverageADC += analogRead(AMPSPIN) - AMPSOFFSET; // average digital value
+  amperage = ((float)ampsAverageADC / (float)AVG_CYCLES) / AMPSCOEFF;  // convert ADC value to actual voltage
+
+  wattage = amperage * battVoltage; // we're talking about charge current times battery voltage
 }
 
 void setPwmFrequency(int pin, int divisor) {
