@@ -18,7 +18,7 @@
 
 #define BUCK_CUTIN 5.0  // minimum voltage to turn on transistors
 #define BUCK_PERIOD 750 // milliseconds between buck converter pwm updates
-#define SOLAR_CUTIN 13.0 // voltage above which the solar panel is useful
+#define SOLAR_CUTIN 2.0 // voltage excess over battVoltage which the solar panel can charge
 #define DISPLAY_PERIOD 750  // how many milliseconds between printdisplay()s
 #define AVG_CYCLES 40  // cycles of averaging function
 #define MAXBUCK 254 // maximum pwm value for buck converter
@@ -38,8 +38,8 @@ int lastBuckPWM = 0; // used to make sure we only analogWrite when integer chang
 float buckPWM = 0.0;  // float to become PWM value of buck converter
 float buckJump = 2.0;  // how much to change buckPWM per doBuck() cycle
 
-void setup() {
-  setPwmFrequency(BUCKPIN,1); // this sets the frequency of PWM on pins 3 and 11 to 31,250 Hz
+void setup() {                 // valid divisors for below are 1, 8, 32, 64, 128, 256, 1024
+  setPwmFrequency(BUCKPIN,64); // this sets the frequency of PWM on pins 3 and 11 to 62,500 Hz / n
   Serial.begin(BAUDRATE);
   pinMode(BUCKPIN,OUTPUT);  // connects to high-side transistors (Drain to Solar plus)
   pinMode(SOLARDISCONNECTPIN,OUTPUT);  // this must be high to tie solar- to ground when charging
@@ -58,7 +58,7 @@ void loop() {
 }
 
 void doBuck() {
-  if ((battVoltage > BUCK_CUTIN) &&  (solarVoltage > SOLAR_CUTIN)) {
+  if ((battVoltage > BUCK_CUTIN) &&  (solarVoltage > battVoltage + SOLAR_CUTIN)) {
     if (timeNow - lastBuck > BUCK_PERIOD) { // if it has been long enough since last time
       lastBuck = timeNow;  // we are doing it now
       if (!buckPWM) {  // the sun just came up
@@ -73,7 +73,10 @@ void doBuck() {
 	  Serial.print("x");
 	}
         buckPWM += buckDirection; // hunt in whatever direction we are trying now
-	if ((battVoltage > BATTFLOATVOLTAGE) && (buckDirection > 0)) buckDirection *= -1;
+	if ((battVoltage > BATTFLOATVOLTAGE) && (buckDirection > 0)) {
+	  buckDirection *= -1;
+	  Serial.print("F");
+	}
         setPWM(buckPWM);  // set the PWM value
         if (buckPWM > MAXBUCK) buckPWM = MAXBUCK;
         if (buckPWM < 1) {        
